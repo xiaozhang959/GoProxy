@@ -154,8 +154,9 @@ tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .form-group{display:flex;flex-direction:column}
 .form-group label{font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--fg-dim);margin-bottom:6px;font-weight:600}
-.form-group input{padding:10px;background:var(--bg-card);border:1px solid var(--border);font-size:12px;font-family:var(--mono);color:var(--fg);outline:none;transition:all 0.2s}
-.form-group input:focus{border-color:var(--border-heavy);background:var(--bg-elevated);box-shadow:0 0 10px var(--border-heavy)}
+.form-group input,.form-group textarea{padding:10px;background:var(--bg-card);border:1px solid var(--border);font-size:12px;font-family:var(--mono);color:var(--fg);outline:none;transition:all 0.2s}
+.form-group textarea{min-height:120px;resize:vertical;line-height:1.5}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--border-heavy);background:var(--bg-elevated);box-shadow:0 0 10px var(--border-heavy)}
 .form-help{font-size:9px;color:var(--gray-5);margin-top:4px;font-family:var(--mono)}
 .modal-actions{display:flex;gap:12px;margin-top:28px;padding-top:28px;border-top:1px solid var(--border)}
 .modal-actions .btn{flex:1;padding:12px 24px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border-heavy);background:var(--bg-card);color:var(--fg);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;transition:all 0.2s}
@@ -400,6 +401,23 @@ tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
       </div>
     </div>
 
+    <!-- 抓取源设置 -->
+    <div class="form-section">
+      <div class="form-section-title" data-i18n="config.section_fetch_sources">抓取更新源</div>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label data-i18n="config.fetch_fast_sources">快速更新源</label>
+          <textarea id="cfg-fetch-fast-sources" spellcheck="false" placeholder="http https://example.com/http.txt&#10;socks5 https://example.com/socks5.txt"></textarea>
+          <div class="form-help" data-i18n="config.fetch_fast_sources_help">补充/紧急抓取使用；每行格式：协议 URL</div>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label data-i18n="config.fetch_slow_sources">慢速更新源</label>
+          <textarea id="cfg-fetch-slow-sources" spellcheck="false" placeholder="http https://example.com/http.txt&#10;socks5 https://example.com/socks5.txt"></textarea>
+          <div class="form-help" data-i18n="config.fetch_slow_sources_help">优化轮换使用；支持 http / socks5，socks4 源按 socks5 处理</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 订阅池设置 -->
     <div class="form-section">
       <div class="form-section-title" data-i18n="config.section_sub_pool">订阅代理池</div>
@@ -638,6 +656,8 @@ const i18n = {
     'msg.delete_confirm': '确定删除代理',
     'msg.config_saved': '配置保存成功',
     'msg.config_failed': '配置保存失败',
+    'msg.fetch_sources_required': '快速更新源和慢速更新源不能为空',
+    'msg.fetch_source_invalid': '抓取源第 {0} 行格式错误，请使用：协议 URL',
     // 设置弹窗新增
     'config.system_title': '系统设置',
     'config.section_proxy_mode': '代理使用模式',
@@ -654,6 +674,11 @@ const i18n = {
     'config.latency_standard': '标准延迟 (ms)',
     'config.latency_healthy': '健康延迟 (ms)',
     'config.latency_emergency': '紧急延迟 (ms)',
+    'config.section_fetch_sources': '抓取更新源',
+    'config.fetch_fast_sources': '快速更新源',
+    'config.fetch_fast_sources_help': '补充/紧急抓取使用；每行格式：协议 URL',
+    'config.fetch_slow_sources': '慢速更新源',
+    'config.fetch_slow_sources_help': '优化轮换使用；支持 http / socks5，socks4 源按 socks5 处理',
     'config.section_sub_pool': '订阅代理池',
     'config.probe_interval': '探测间隔 (分钟)',
     'config.probe_interval_help': '禁用代理的唤醒探测间隔',
@@ -793,6 +818,8 @@ const i18n = {
     'msg.delete_confirm': 'Delete proxy',
     'msg.config_saved': 'Configuration saved successfully',
     'msg.config_failed': 'Failed to save configuration',
+    'msg.fetch_sources_required': 'Fast and slow fetch sources cannot be empty',
+    'msg.fetch_source_invalid': 'Invalid fetch source at line {0}. Use: protocol URL',
     'config.system_title': 'System Settings',
     'config.section_proxy_mode': 'Proxy Mode',
     'config.proxy_strategy': 'Outbound Proxy Strategy',
@@ -808,6 +835,11 @@ const i18n = {
     'config.latency_standard': 'Standard Latency (ms)',
     'config.latency_healthy': 'Healthy Latency (ms)',
     'config.latency_emergency': 'Emergency Latency (ms)',
+    'config.section_fetch_sources': 'Fetch Sources',
+    'config.fetch_fast_sources': 'Fast Update Sources',
+    'config.fetch_fast_sources_help': 'Used for refill/emergency fetch; one source per line: protocol URL',
+    'config.fetch_slow_sources': 'Slow Update Sources',
+    'config.fetch_slow_sources_help': 'Used by optimization rotation; supports http / socks5, socks4 sources are treated as socks5',
     'config.section_sub_pool': 'Subscription Pool',
     'config.probe_interval': 'Probe Interval (min)',
     'config.probe_interval_help': 'Wake-up probe interval for disabled proxies',
@@ -1208,6 +1240,43 @@ async function loadLogs() {
   loadProxies();
 }
 
+function sourcesToText(sources) {
+  return (sources || []).map(s => (s.protocol || '').toLowerCase() + ' ' + (s.url || '')).join('\n');
+}
+
+function parseSourceText(text) {
+  const sources = [];
+  const lines = (text || '').split('\n');
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) return;
+
+    const sep = line.search(/[,\s]+/);
+    if (sep <= 0) {
+      throw new Error(t('msg.fetch_source_invalid').replace('{0}', index + 1));
+    }
+
+    let protocol = line.slice(0, sep).trim().toLowerCase();
+    const sourceURL = line.slice(sep).replace(/^[,\s]+/, '').trim();
+    if (protocol === 'socks4') protocol = 'socks5';
+    if ((protocol !== 'http' && protocol !== 'socks5') || !sourceURL) {
+      throw new Error(t('msg.fetch_source_invalid').replace('{0}', index + 1));
+    }
+
+    try {
+      const parsed = new URL(sourceURL);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('unsupported scheme');
+      }
+    } catch (e) {
+      throw new Error(t('msg.fetch_source_invalid').replace('{0}', index + 1));
+    }
+
+    sources.push({protocol, url: sourceURL});
+  });
+  return sources;
+}
+
 async function openSettings() {
   const cfg = await api('/api/config');
   if (!cfg) return;
@@ -1226,6 +1295,8 @@ async function openSettings() {
   document.getElementById('cfg-replace-threshold').value = cfg.replace_threshold;
   document.getElementById('cfg-blocked-countries').value = (cfg.blocked_countries || []).join(',');
   document.getElementById('cfg-allowed-countries').value = (cfg.allowed_countries || []).join(',');
+  document.getElementById('cfg-fetch-fast-sources').value = sourcesToText(cfg.fetch_fast_sources);
+  document.getElementById('cfg-fetch-slow-sources').value = sourcesToText(cfg.fetch_slow_sources);
   // 将 mode + priority 映射到5种模式
   const mode = cfg.custom_proxy_mode || 'mixed';
   const customPri = cfg.custom_priority === true;
@@ -1248,6 +1319,20 @@ function closeSettings() {
 }
 
 async function saveConfig() {
+  let fastSources = [];
+  let slowSources = [];
+  try {
+    fastSources = parseSourceText(document.getElementById('cfg-fetch-fast-sources').value);
+    slowSources = parseSourceText(document.getElementById('cfg-fetch-slow-sources').value);
+  } catch (e) {
+    alert(e.message);
+    return;
+  }
+  if (fastSources.length === 0 || slowSources.length === 0) {
+    alert(t('msg.fetch_sources_required'));
+    return;
+  }
+
   const cfg = {
     pool_max_size: parseInt(document.getElementById('cfg-pool-size').value),
     pool_http_ratio: parseFloat(document.getElementById('cfg-http-ratio').value),
@@ -1278,6 +1363,8 @@ async function saveConfig() {
     custom_free_priority: document.getElementById('cfg-custom-mode').value === 'mixed_free_priority',
     custom_probe_interval: parseInt(document.getElementById('cfg-custom-probe').value),
     custom_refresh_interval: parseInt(document.getElementById('cfg-custom-refresh').value),
+    fetch_fast_sources: fastSources,
+    fetch_slow_sources: slowSources,
   };
 
   const result = await api('/api/config/save', {
