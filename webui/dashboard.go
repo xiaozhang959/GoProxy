@@ -9,37 +9,107 @@ const dashboardHTML = `<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script>
+(function(){
+  try {
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('goproxy-theme') || 'warm');
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'warm');
+  }
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0a0a;
-  --bg-elevated:#111;
-  --bg-card:#0d0d0d;
-  --fg:#00ff41;
-  --fg-dim:#00cc33;
-  --fg-text:#0f0;
-  --border:#1a3a1a;
-  --border-heavy:#00ff41;
-  --gray-1:#0d0d0d;
-  --gray-2:#151515;
-  --gray-3:#1a1a1a;
-  --gray-4:#2a4a2a;
-  --gray-5:#00aa2a;
-  --gray-6:#00dd38;
-  --green:#00ff41;
-  --yellow:#ffff00;
-  --orange:#ff8800;
-  --red:#ff0033;
+  color-scheme:light;
+  --bg:#f7efe4;
+  --bg-elevated:#fff8ef;
+  --bg-card:#fffaf4;
+  --fg:#7a4524;
+  --fg-dim:#9a653d;
+  --fg-text:#3c2415;
+  --border:#ead2b8;
+  --border-heavy:#c87938;
+  --gray-1:#fffaf4;
+  --gray-2:#f1dfc8;
+  --gray-3:#ddc3a2;
+  --gray-4:#b99675;
+  --gray-5:#8f6b50;
+  --gray-6:#5f3d2a;
+  --green:#2f8f5b;
+  --yellow:#c4871c;
+  --orange:#cf6a2f;
+  --red:#b9413f;
+  --scanline:rgba(125,69,36,0.025);
+  --ambient:rgba(204,126,56,0.13);
+  --shadow-soft:rgba(126,74,37,0.12);
+  --shadow-medium:rgba(126,74,37,0.24);
+  --row-hover:rgba(201,121,56,0.08);
+  --modal-backdrop:rgba(38,24,16,0.58);
   --mono:JetBrains Mono,Share Tech Mono,monospace;
   --sans:JetBrains Mono,monospace;
 }
+html[data-theme="paper"]{
+  color-scheme:light;
+  --bg:#f4f5f3;
+  --bg-elevated:#ffffff;
+  --bg-card:#fbfbfa;
+  --fg:#374151;
+  --fg-dim:#64748b;
+  --fg-text:#111827;
+  --border:#d8dde3;
+  --border-heavy:#6b7280;
+  --gray-1:#ffffff;
+  --gray-2:#eef1f4;
+  --gray-3:#dfe4e9;
+  --gray-4:#b9c1ca;
+  --gray-5:#6b7280;
+  --gray-6:#374151;
+  --green:#15803d;
+  --yellow:#a16207;
+  --orange:#c05621;
+  --red:#b91c1c;
+  --scanline:rgba(55,65,81,0.018);
+  --ambient:rgba(100,116,139,0.08);
+  --shadow-soft:rgba(15,23,42,0.08);
+  --shadow-medium:rgba(15,23,42,0.16);
+  --row-hover:rgba(100,116,139,0.10);
+  --modal-backdrop:rgba(15,23,42,0.42);
+}
+html[data-theme="night"]{
+  color-scheme:dark;
+  --bg:#0f1724;
+  --bg-elevated:#151f31;
+  --bg-card:#111b2c;
+  --fg:#d7e5f7;
+  --fg-dim:#93a4bb;
+  --fg-text:#edf5ff;
+  --border:#26364d;
+  --border-heavy:#6aa7ff;
+  --gray-1:#111b2c;
+  --gray-2:#17243a;
+  --gray-3:#22324a;
+  --gray-4:#40536f;
+  --gray-5:#91a2bb;
+  --gray-6:#d7e5f7;
+  --green:#4ade80;
+  --yellow:#facc15;
+  --orange:#fb923c;
+  --red:#f87171;
+  --scanline:rgba(106,167,255,0.026);
+  --ambient:rgba(75,126,207,0.12);
+  --shadow-soft:rgba(38,54,77,0.28);
+  --shadow-medium:rgba(57,102,168,0.30);
+  --row-hover:rgba(106,167,255,0.08);
+  --modal-backdrop:rgba(3,7,18,0.78);
+}
 body{background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;position:relative}
 
-/* CRT 扫描线效果 */
-body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,rgba(0,255,65,0.03) 0px,transparent 1px,transparent 2px,rgba(0,255,65,0.03) 3px);pointer-events:none;z-index:9999}
+/* 柔和纹理效果 */
+body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,var(--scanline) 0px,transparent 1px,transparent 3px);pointer-events:none;z-index:9999}
 
-/* 荧光光晕效果 */
-body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at center,rgba(0,255,65,0.05) 0%,transparent 70%);pointer-events:none;z-index:9998}
+/* 环境光效果 */
+body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at 30% 0%,var(--ambient) 0%,transparent 65%);pointer-events:none;z-index:9998}
 
 .layout{max-width:1800px;margin:0 auto;padding:0 32px}
 
@@ -49,7 +119,7 @@ body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backgr
 .sidebar{position:sticky;top:32px}
 
 /* 控制面板 */
-.control-panel{background:var(--bg-card);border:1px solid var(--border-heavy);padding:20px;margin-bottom:20px;box-shadow:0 0 20px rgba(0,255,65,0.15)}
+.control-panel{background:var(--bg-card);border:1px solid var(--border-heavy);padding:20px;margin-bottom:20px;box-shadow:0 10px 28px var(--shadow-soft)}
 .control-header{display:flex;align-items:center;justify-content:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .control-title{font-size:14px;font-weight:700;letter-spacing:0.12em;font-family:var(--mono);text-transform:uppercase;color:var(--fg);text-shadow:0 0 10px var(--fg)}
 .control-ops{display:flex;flex-direction:row;gap:8px}
@@ -60,13 +130,12 @@ body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backgr
 
 /* 代理列表区域 */
 .proxy-section{display:block}
-.proxy-header{position:sticky;top:0;z-index:100;background:var(--bg);padding:20px 0 16px;border-bottom:1px solid var(--border-heavy);display:flex;align-items:center;justify-content:space-between;gap:24px;backdrop-filter:blur(8px);box-shadow:0 2px 0 0 rgba(0,255,65,0.2)}
+.proxy-header{position:sticky;top:0;z-index:100;background:var(--bg);padding:20px 0 16px;border-bottom:1px solid var(--border-heavy);display:flex;align-items:center;justify-content:space-between;gap:24px;backdrop-filter:blur(12px);box-shadow:0 12px 28px var(--shadow-soft)}
 .proxy-logo-area{display:flex;align-items:baseline;gap:12px;flex-shrink:0}
-.proxy-logo{font-size:28px;font-weight:900;letter-spacing:0.2em;font-family:var(--mono);text-transform:uppercase;color:var(--fg);text-shadow:0 0 15px var(--fg),0 0 30px var(--fg);animation:glow 2s ease-in-out infinite alternate}
-@keyframes glow{0%{text-shadow:0 0 15px var(--fg),0 0 30px var(--fg)}100%{text-shadow:0 0 20px var(--fg),0 0 40px var(--fg),0 0 60px var(--fg)}}
+.proxy-logo{font-size:28px;font-weight:900;letter-spacing:0.2em;font-family:var(--mono);text-transform:uppercase;color:var(--fg-text);text-shadow:0 8px 24px var(--shadow-medium)}
 .user-badge{font-size:10px;color:var(--fg-dim);font-family:var(--mono);letter-spacing:0.08em;opacity:0.6}
 .proxy-content{}
-.header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.header-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;flex-shrink:0}
 
 /* 响应式：屏幕小于1200px时变为单列 */
 @media (max-width: 1200px) {
@@ -78,7 +147,7 @@ body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backgr
 }
 
 /* Health Grid - 侧边栏紧凑布局 */
-.health-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--bg);border:1px solid var(--border);margin-bottom:10px;box-shadow:0 0 20px rgba(0,255,65,0.1)}
+.health-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--bg);border:1px solid var(--border);margin-bottom:10px;box-shadow:0 10px 26px var(--shadow-soft)}
 .health-card{background:var(--bg-card);padding:8px 10px;position:relative;border:1px solid var(--border)}
 .health-label{font-size:8px;text-transform:uppercase;letter-spacing:0.15em;color:var(--fg-dim);margin-bottom:4px;font-weight:600;font-family:var(--mono)}
 .health-value{font-size:18px;font-weight:700;font-family:var(--mono);line-height:1;letter-spacing:0.05em;color:var(--fg);text-shadow:0 0 10px var(--fg)}
@@ -96,14 +165,15 @@ body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backgr
 .tab:hover{background:var(--border);color:var(--fg);box-shadow:0 0 8px var(--border)}
 
 /* 筛选下拉框 */
-.filter-select{padding:8px 16px;min-height:36px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);color:var(--fg-dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;transition:all 0.2s;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300ff41' d='M6 9L1 4h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:32px}
+.filter-select{padding:8px 16px;min-height:36px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--border);background-color:var(--bg-card);color:var(--fg-dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;transition:all 0.2s;outline:none;appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--fg-dim) 50%),linear-gradient(135deg,var(--fg-dim) 50%,transparent 50%);background-repeat:no-repeat;background-position:calc(100% - 14px) 15px,calc(100% - 9px) 15px;background-size:5px 5px,5px 5px;padding-right:32px}
 .filter-select:hover{background-color:var(--border);color:var(--fg);box-shadow:0 0 8px var(--border)}
 .filter-select option{background:var(--bg-card);color:var(--fg-dim)}
+.theme-select{min-width:86px}
 
 /* Quality Bar - 侧边栏紧凑布局 */
-.quality-bar{background:var(--bg-card);border:1px solid var(--border);padding:16px;margin-bottom:16px;box-shadow:0 0 15px rgba(0,255,65,0.08)}
+.quality-bar{background:var(--bg-card);border:1px solid var(--border);padding:16px;margin-bottom:16px;box-shadow:0 10px 24px var(--shadow-soft)}
 .quality-bar-title{font-size:8px;text-transform:uppercase;letter-spacing:0.15em;color:var(--fg-dim);margin-bottom:10px;font-weight:600}
-.quality-visual{display:flex;height:20px;border:1px solid var(--border);overflow:hidden;box-shadow:inset 0 0 10px rgba(0,255,65,0.1)}
+.quality-visual{display:flex;height:20px;border:1px solid var(--border);overflow:hidden;box-shadow:inset 0 0 10px var(--shadow-soft)}
 .quality-segment{display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:var(--mono);color:#000;transition:width 0.3s;text-shadow:none}
 .quality-s{background:var(--green);box-shadow:0 0 10px var(--green)}
 .quality-a{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
@@ -125,7 +195,7 @@ thead{position:sticky;top:78px;z-index:50;border-bottom:1px solid var(--border-h
 th{padding:10px 12px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--fg-dim);font-weight:600}
 td{padding:12px;border-bottom:1px solid var(--border);color:var(--fg-dim)}
 tr:last-child td{border-bottom:none}
-tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
+tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px var(--row-hover)}
 .cell-mono{font-family:var(--mono);font-size:10px}
 .cell-grade{font-weight:700;font-size:14px}
 .cell-clickable{cursor:pointer;transition:all 0.2s}
@@ -140,14 +210,14 @@ tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
 .badge-socks5{background:var(--fg-dim);color:#000;border-color:var(--fg-dim);box-shadow:0 0 6px var(--fg-dim)}
 .latency{font-weight:600}
 .latency-excellent{color:var(--green)}
-.latency-good{color:#333}
-.latency-fair{color:#666}
+.latency-good{color:var(--fg-text)}
+.latency-fair{color:var(--gray-5)}
 .latency-poor{color:var(--red)}
 
 /* Modal */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);backdrop-filter:blur(10px);z-index:100;align-items:center;justify-content:center}
+.modal-overlay{display:none;position:fixed;inset:0;background:var(--modal-backdrop);backdrop-filter:blur(10px);z-index:100;align-items:center;justify-content:center}
 .modal-overlay.show{display:flex}
-.modal{background:var(--bg-elevated);border:1px solid var(--border-heavy);padding:40px;width:700px;box-shadow:0 0 40px rgba(0,255,65,0.3);max-height:90vh;overflow-y:auto}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-heavy);padding:40px;width:700px;box-shadow:0 24px 64px var(--shadow-medium);max-height:90vh;overflow-y:auto}
 .modal-title{font-size:20px;font-weight:700;margin-bottom:28px;letter-spacing:0.08em;text-transform:uppercase;color:var(--fg);text-shadow:0 0 10px var(--fg)}
 .form-section{margin-bottom:28px}
 .form-section-title{font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--fg-dim);margin-bottom:12px;font-weight:600;padding-bottom:8px;border-bottom:1px solid var(--border)}
@@ -164,7 +234,7 @@ tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
 .modal-actions .btn-secondary:hover{background:var(--gray-2);color:var(--fg);box-shadow:0 0 10px var(--border)}
 
 /* Log - 适配侧边栏布局 */
-.log-box{padding:12px;background:var(--bg);border:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--fg-dim);height:350px;overflow-y:auto;line-height:1.8;box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
+.log-box{padding:12px;background:var(--bg);border:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--fg-dim);height:350px;overflow-y:auto;line-height:1.8;box-shadow:inset 0 0 20px var(--row-hover)}
 .log-box::-webkit-scrollbar{width:4px}
 .log-box::-webkit-scrollbar-track{background:var(--bg)}
 .log-box::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
@@ -175,7 +245,7 @@ tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
 
 /* 侧边栏样式 */
 .sidebar>*:not(:last-child){margin-bottom:16px}
-.sidebar .section{margin-bottom:0;border:1px solid var(--border);background:var(--bg-card);padding:16px;box-shadow:0 0 15px rgba(0,255,65,0.1)}
+.sidebar .section{margin-bottom:0;border:1px solid var(--border);background:var(--bg-card);padding:16px;box-shadow:0 10px 24px var(--shadow-soft)}
 .sidebar .section-header{padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--border)}
 .sidebar .section-title{font-size:12px;letter-spacing:0.12em}
 
@@ -218,6 +288,11 @@ tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
             </select>
             <select class="filter-select" id="country-filter" onchange="setCountryFilter(this.value)">
               <option value="" id="country-filter-label">出口国家</option>
+            </select>
+            <select class="filter-select theme-select" id="theme-select" onchange="setTheme(this.value)" title="Theme">
+              <option value="warm" data-i18n="theme.warm">暖色</option>
+              <option value="paper" data-i18n="theme.paper">灰白</option>
+              <option value="night" data-i18n="theme.night">黑夜</option>
             </select>
             <button class="tab" onclick="toggleLang()" id="lang-btn">[ EN ]</button>
             <a href="https://github.com/isboyjc/ProxyGo" target="_blank" class="tab" title="GitHub">
@@ -318,10 +393,10 @@ tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px rgba(0,255,65,0.05)}
           <div class="quality-segment quality-c" style="width:0%"></div>
         </div>
         <div class="quality-legend">
-          <div class="quality-legend-item"><span class="quality-legend-dot" style="background:#22c55e"></span><span data-i18n="quality.grade_s">S级</span> (<span id="grade-s-count">0</span>)</div>
-          <div class="quality-legend-item"><span class="quality-legend-dot" style="background:#eab308"></span><span data-i18n="quality.grade_a">A级</span> (<span id="grade-a-count">0</span>)</div>
-          <div class="quality-legend-item"><span class="quality-legend-dot" style="background:#f97316"></span><span data-i18n="quality.grade_b">B级</span> (<span id="grade-b-count">0</span>)</div>
-          <div class="quality-legend-item"><span class="quality-legend-dot" style="background:#ef4444"></span><span data-i18n="quality.grade_c">C级</span> (<span id="grade-c-count">0</span>)</div>
+          <div class="quality-legend-item"><span class="quality-legend-dot" style="background:var(--green)"></span><span data-i18n="quality.grade_s">S级</span> (<span id="grade-s-count">0</span>)</div>
+          <div class="quality-legend-item"><span class="quality-legend-dot" style="background:var(--yellow)"></span><span data-i18n="quality.grade_a">A级</span> (<span id="grade-a-count">0</span>)</div>
+          <div class="quality-legend-item"><span class="quality-legend-dot" style="background:var(--orange)"></span><span data-i18n="quality.grade_b">B级</span> (<span id="grade-b-count">0</span>)</div>
+          <div class="quality-legend-item"><span class="quality-legend-dot" style="background:var(--red)"></span><span data-i18n="quality.grade_c">C级</span> (<span id="grade-c-count">0</span>)</div>
         </div>
       </div>
 
@@ -564,6 +639,9 @@ const i18n = {
     'nav.config': '配置',
     'nav.login': '登录',
     'nav.logout': '退出',
+    'theme.warm': '暖色',
+    'theme.paper': '灰白',
+    'theme.night': '黑夜',
     'health.status': '池子状态',
     'health.total': '总代理数',
     'health.capacity': '容量',
@@ -719,6 +797,9 @@ const i18n = {
     'nav.config': 'Config',
     'nav.login': 'Login',
     'nav.logout': 'Logout',
+    'theme.warm': 'Warm',
+    'theme.paper': 'Paper',
+    'theme.night': 'Night',
     'health.status': 'Pool Status',
     'health.total': 'Total Proxies',
     'health.capacity': 'capacity',
@@ -868,6 +949,33 @@ const i18n = {
 
 let currentLang = 'zh';
 let logCountdown = 5;
+const themeStorageKey = 'goproxy-theme';
+let currentTheme = 'warm';
+
+function getSavedTheme() {
+  try {
+    return localStorage.getItem(themeStorageKey) || 'warm';
+  } catch (e) {
+    return 'warm';
+  }
+}
+
+function applyTheme(theme) {
+  if (!['warm', 'paper', 'night'].includes(theme)) {
+    theme = 'warm';
+  }
+  currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  try {
+    localStorage.setItem(themeStorageKey, theme);
+  } catch (e) {}
+  const select = document.getElementById('theme-select');
+  if (select) select.value = theme;
+}
+
+function setTheme(theme) {
+  applyTheme(theme);
+}
 
 function t(key) {
   return i18n[currentLang][key] || key;
@@ -896,6 +1004,8 @@ function updateI18n() {
   if (protocolLabel) protocolLabel.textContent = t('proxy.filter_protocol');
   const countryLabel = document.getElementById('country-filter-label');
   if (countryLabel) countryLabel.textContent = t('proxy.filter_country');
+  const themeSelect = document.getElementById('theme-select');
+  if (themeSelect) themeSelect.value = currentTheme;
 }
 
 function toggleLang() {
@@ -917,6 +1027,8 @@ if (savedLang) {
   currentLang = savedLang;
   updateI18n();
 }
+currentTheme = getSavedTheme();
+applyTheme(currentTheme);
 
 let currentProtocol = '';
 let currentCountry = '';
