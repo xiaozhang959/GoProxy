@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -20,6 +21,132 @@ func dataDir() string {
 }
 
 func ConfigFile() string { return dataDir() + "config.json" }
+
+// ProxySource 定义一个可配置的公开代理抓取源。
+type ProxySource struct {
+	URL      string `json:"url"`
+	Protocol string `json:"protocol"` // http 或 socks5
+}
+
+var defaultFastFetchSources = []ProxySource{
+	// ProxyScraper - 每30分钟更新
+	{"https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/http.txt", "http"},
+	{"https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/socks4.txt", "socks5"},
+	{"https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/socks5.txt", "socks5"},
+	// monosans - 每小时更新
+	{"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt", "http"},
+	// prxchk - 频繁更新
+	{"https://raw.githubusercontent.com/prxchk/proxy-list/main/http.txt", "http"},
+	{"https://raw.githubusercontent.com/prxchk/proxy-list/main/socks5.txt", "socks5"},
+	{"https://raw.githubusercontent.com/prxchk/proxy-list/main/socks4.txt", "socks5"},
+	// sunny9577 - 自动抓取更新
+	{"https://cdn.jsdelivr.net/gh/sunny9577/proxy-scraper/generated/http_proxies.txt", "http"},
+	{"https://cdn.jsdelivr.net/gh/sunny9577/proxy-scraper/generated/socks5_proxies.txt", "socks5"},
+	{"https://cdn.jsdelivr.net/gh/sunny9577/proxy-scraper/generated/socks4_proxies.txt", "socks5"},
+}
+
+var defaultSlowFetchSources = []ProxySource{
+	// TheSpeedX - 每天更新，量大
+	{"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt", "http"},
+	{"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks4.txt", "socks5"},
+	{"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt", "socks5"},
+	// monosans SOCKS
+	{"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks4.txt", "socks5"},
+	{"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt", "socks5"},
+	// databay-labs - 备用源
+	{"https://cdn.jsdelivr.net/gh/databay-labs/free-proxy-list/http.txt", "http"},
+	{"https://cdn.jsdelivr.net/gh/databay-labs/free-proxy-list/socks5.txt", "socks5"},
+	// Anonym0usWork1221 - 量大质量尚可
+	{"https://cdn.jsdelivr.net/gh/Anonym0usWork1221/Free-Proxies/proxy_files/http_proxies.txt", "http"},
+	{"https://cdn.jsdelivr.net/gh/Anonym0usWork1221/Free-Proxies/proxy_files/socks5_proxies.txt", "socks5"},
+	{"https://cdn.jsdelivr.net/gh/Anonym0usWork1221/Free-Proxies/proxy_files/socks4_proxies.txt", "socks5"},
+	// ALIILAPRO
+	{"https://cdn.jsdelivr.net/gh/ALIILAPRO/Proxy/http.txt", "http"},
+	{"https://cdn.jsdelivr.net/gh/ALIILAPRO/Proxy/socks4.txt", "socks5"},
+	// vakhov/fresh-proxy-list
+	{"https://cdn.jsdelivr.net/gh/vakhov/fresh-proxy-list/http.txt", "http"},
+	{"https://cdn.jsdelivr.net/gh/vakhov/fresh-proxy-list/socks5.txt", "socks5"},
+	{"https://cdn.jsdelivr.net/gh/vakhov/fresh-proxy-list/socks4.txt", "socks5"},
+	// Zaeem20
+	{"https://cdn.jsdelivr.net/gh/Zaeem20/FREE_PROXIES_LIST/http.txt", "http"},
+	{"https://cdn.jsdelivr.net/gh/Zaeem20/FREE_PROXIES_LIST/socks4.txt", "socks5"},
+	// hookzof - socks5 专项
+	{"https://cdn.jsdelivr.net/gh/hookzof/socks5_list/proxy.txt", "socks5"},
+	// proxy4parsing
+	{"https://cdn.jsdelivr.net/gh/proxy4parsing/proxy-list/http.txt", "http"},
+	{"https://cdn.jsdelivr.net/gh/proxy4parsing/proxy-list/socks5.txt", "socks5"},
+}
+
+func cloneProxySources(sources []ProxySource) []ProxySource {
+	clone := make([]ProxySource, len(sources))
+	copy(clone, sources)
+	return clone
+}
+
+func DefaultFastFetchSources() []ProxySource {
+	return cloneProxySources(defaultFastFetchSources)
+}
+
+func DefaultSlowFetchSources() []ProxySource {
+	return cloneProxySources(defaultSlowFetchSources)
+}
+
+// NormalizeProxySources 清理配置源，兼容 socks4 源按 socks5 代理处理。
+func NormalizeProxySources(sources []ProxySource) []ProxySource {
+	normalized, _ := normalizeProxySources(sources, false)
+	return normalized
+}
+
+// ValidateProxySources 校验并规范化页面提交的源配置。
+func ValidateProxySources(sources []ProxySource) ([]ProxySource, error) {
+	return normalizeProxySources(sources, true)
+}
+
+func normalizeProxySources(sources []ProxySource, strict bool) ([]ProxySource, error) {
+	result := make([]ProxySource, 0, len(sources))
+	seen := make(map[string]struct{})
+
+	for _, source := range sources {
+		sourceURL := strings.TrimSpace(source.URL)
+		protocol := strings.ToLower(strings.TrimSpace(source.Protocol))
+		if sourceURL == "" && protocol == "" {
+			continue
+		}
+		if protocol == "socks4" {
+			protocol = "socks5"
+		}
+		if protocol != "http" && protocol != "socks5" {
+			if strict {
+				return nil, fmt.Errorf("invalid source protocol: %s", source.Protocol)
+			}
+			continue
+		}
+		if sourceURL == "" {
+			if strict {
+				return nil, fmt.Errorf("empty source url")
+			}
+			continue
+		}
+		if strict {
+			parsed, err := url.Parse(sourceURL)
+			if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+				return nil, fmt.Errorf("invalid source url: %s", sourceURL)
+			}
+			if parsed.Scheme != "http" && parsed.Scheme != "https" {
+				return nil, fmt.Errorf("unsupported source url scheme: %s", parsed.Scheme)
+			}
+		}
+
+		key := protocol + " " + sourceURL
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, ProxySource{URL: sourceURL, Protocol: protocol})
+	}
+
+	return result, nil
+}
 
 type Config struct {
 	// WebUI 端口
@@ -70,8 +197,8 @@ type Config struct {
 	ValidateURL         string // 验证目标 URL
 
 	// ========== 健康检查配置 ==========
-	HealthCheckInterval   int // 状态监控间隔（分钟）（默认5）
-	HealthCheckBatchSize  int // 每批验证数量（默认20）
+	HealthCheckInterval    int // 状态监控间隔（分钟）（默认5）
+	HealthCheckBatchSize   int // 每批验证数量（默认20）
 	HealthCheckConcurrency int // 批次内并发数（默认50）
 
 	// ========== 优化配置 ==========
@@ -83,9 +210,11 @@ type Config struct {
 	IPQueryRateLimit int // IP查询限流（次/秒）（默认10）
 
 	// ========== 源管理配置 ==========
-	SourceFailThreshold    int // 源降级阈值（默认3）
-	SourceDisableThreshold int // 源禁用阈值（默认5）
-	SourceCooldownMinutes  int // 源禁用冷却时间（默认30）
+	SourceFailThreshold    int           // 源降级阈值（默认3）
+	SourceDisableThreshold int           // 源禁用阈值（默认5）
+	SourceCooldownMinutes  int           // 源禁用冷却时间（默认30）
+	FetchFastSources       []ProxySource // 快速更新源（补充/紧急抓取）
+	FetchSlowSources       []ProxySource // 慢速更新源（优化轮换抓取）
 
 	// ========== 自定义订阅代理配置 ==========
 	CustomProxyMode       string // 代理使用模式：mixed / custom_only / free_only（默认 mixed）
@@ -103,9 +232,6 @@ type Config struct {
 	FetchInterval int // 已废弃，由智能抓取器管理
 	CheckInterval int // 已废弃，由 HealthCheckInterval 替代
 
-	// 代理来源 URL（已废弃，内置多源）
-	HTTPSourceURL   string
-	SOCKS5SourceURL string
 }
 
 var (
@@ -123,7 +249,7 @@ func DefaultConfig() *Config {
 	if password == "" {
 		password = DefaultPassword
 	}
-	
+
 	// 读取代理认证配置
 	proxyAuthEnabled := os.Getenv("PROXY_AUTH_ENABLED") == "true"
 	proxyAuthUsername := os.Getenv("PROXY_AUTH_USERNAME")
@@ -135,7 +261,7 @@ func DefaultConfig() *Config {
 	if proxyAuthPassword != "" {
 		proxyAuthHash = passwordHash(proxyAuthPassword)
 	}
-	
+
 	// 读取地理过滤配置
 	blockedCountries := []string{"CN"} // 默认屏蔽中国大陆
 	if blockedEnv := os.Getenv("BLOCKED_COUNTRIES"); blockedEnv != "" {
@@ -162,7 +288,7 @@ func DefaultConfig() *Config {
 			}
 		}
 	}
-	
+
 	// 读取订阅代理配置
 	customProxyMode := os.Getenv("CUSTOM_PROXY_MODE")
 	if customProxyMode == "" {
@@ -182,21 +308,21 @@ func DefaultConfig() *Config {
 		SOCKS5Port:        ":7779",
 		StableSOCKS5Port:  ":7780",
 		DBPath:            dataDir() + "proxy.db",
-		
+
 		// 代理认证配置
 		ProxyAuthEnabled:      proxyAuthEnabled,
 		ProxyAuthUsername:     proxyAuthUsername,
 		ProxyAuthPassword:     proxyAuthPassword,
 		ProxyAuthPasswordHash: proxyAuthHash,
-		
+
 		// 地理过滤配置
 		BlockedCountries: blockedCountries,
 		AllowedCountries: allowedCountries,
 
 		// 池子容量配置
-		PoolMaxSize:        100,  // 总容量
-		PoolHTTPRatio:      0.3,  // HTTP占30%
-		PoolMinPerProtocol: 10,   // 每协议最少10个
+		PoolMaxSize:        100, // 总容量
+		PoolHTTPRatio:      0.3, // HTTP占30%
+		PoolMinPerProtocol: 10,  // 每协议最少10个
 
 		// 延迟标准配置
 		MaxLatencyMs:          2500, // 标准2.5秒
@@ -226,6 +352,8 @@ func DefaultConfig() *Config {
 		SourceFailThreshold:    3,  // 失败3次降级
 		SourceDisableThreshold: 5,  // 失败5次禁用
 		SourceCooldownMinutes:  30, // 禁用30分钟
+		FetchFastSources:       DefaultFastFetchSources(),
+		FetchSlowSources:       DefaultSlowFetchSources(),
 
 		// 自定义订阅代理配置
 		CustomProxyMode:       customProxyMode,
@@ -241,8 +369,6 @@ func DefaultConfig() *Config {
 		MaxRetry:      3,
 		FetchInterval: 30,
 		CheckInterval: 10,
-		HTTPSourceURL: "https://cdn.jsdelivr.net/gh/databay-labs/free-proxy-list/http.txt",
-		SOCKS5SourceURL: "https://cdn.jsdelivr.net/gh/databay-labs/free-proxy-list/socks5.txt",
 	}
 }
 
@@ -305,6 +431,18 @@ func Load() *Config {
 			}
 			if saved.CheckInterval > 0 {
 				cfg.CheckInterval = saved.CheckInterval
+			}
+
+			// 抓取源配置
+			if saved.FetchFastSources != nil {
+				if sources := NormalizeProxySources(saved.FetchFastSources); len(sources) > 0 {
+					cfg.FetchFastSources = sources
+				}
+			}
+			if saved.FetchSlowSources != nil {
+				if sources := NormalizeProxySources(saved.FetchSlowSources); len(sources) > 0 {
+					cfg.FetchSlowSources = sources
+				}
 			}
 
 			// 地理过滤配置（config.json 优先于环境变量）
@@ -389,6 +527,10 @@ type savedConfig struct {
 	SingBoxPath           string `json:"singbox_path,omitempty"`
 	SingBoxBasePort       int    `json:"singbox_base_port,omitempty"`
 
+	// 抓取源配置
+	FetchFastSources []ProxySource `json:"fetch_fast_sources,omitempty"`
+	FetchSlowSources []ProxySource `json:"fetch_slow_sources,omitempty"`
+
 	// 兼容旧配置
 	FetchInterval int `json:"fetch_interval,omitempty"`
 	CheckInterval int `json:"check_interval,omitempty"`
@@ -424,6 +566,8 @@ func Save(cfg *Config) error {
 		CustomRefreshInterval: cfg.CustomRefreshInterval,
 		SingBoxPath:           cfg.SingBoxPath,
 		SingBoxBasePort:       cfg.SingBoxBasePort,
+		FetchFastSources:      NormalizeProxySources(cfg.FetchFastSources),
+		FetchSlowSources:      NormalizeProxySources(cfg.FetchSlowSources),
 		FetchInterval:         cfg.FetchInterval,
 		CheckInterval:         cfg.CheckInterval,
 	}, "", "  ")

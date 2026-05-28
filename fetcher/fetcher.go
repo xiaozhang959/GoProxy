@@ -9,78 +9,20 @@ import (
 	"strings"
 	"time"
 
+	"goproxy/config"
 	"goproxy/storage"
 )
 
-// 代理来源定义
-type Source struct {
-	URL      string
-	Protocol string // http 或 socks5
-}
-
-// 快速更新源（5-30分钟更新）- 用于紧急和补充模式
-var fastUpdateSources = []Source{
-	// ProxyScraper - 每30分钟更新
-	{"https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/http.txt", "http"},
-	{"https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/socks4.txt", "socks5"},
-	{"https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/socks5.txt", "socks5"},
-	// monosans - 每小时更新
-	{"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt", "http"},
-	// prxchk - 频繁更新
-	{"https://raw.githubusercontent.com/prxchk/proxy-list/main/http.txt", "http"},
-	{"https://raw.githubusercontent.com/prxchk/proxy-list/main/socks5.txt", "socks5"},
-	{"https://raw.githubusercontent.com/prxchk/proxy-list/main/socks4.txt", "socks5"},
-	// sunny9577 - 自动抓取更新
-	{"https://cdn.jsdelivr.net/gh/sunny9577/proxy-scraper/generated/http_proxies.txt", "http"},
-	{"https://cdn.jsdelivr.net/gh/sunny9577/proxy-scraper/generated/socks5_proxies.txt", "socks5"},
-	{"https://cdn.jsdelivr.net/gh/sunny9577/proxy-scraper/generated/socks4_proxies.txt", "socks5"},
-}
-
-// 慢速更新源（每天更新）- 用于优化轮换模式
-var slowUpdateSources = []Source{
-	// TheSpeedX - 每天更新，量大
-	{"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt", "http"},
-	{"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks4.txt", "socks5"},
-	{"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt", "socks5"},
-	// monosans SOCKS
-	{"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks4.txt", "socks5"},
-	{"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt", "socks5"},
-	// databay-labs - 备用源
-	{"https://cdn.jsdelivr.net/gh/databay-labs/free-proxy-list/http.txt", "http"},
-	{"https://cdn.jsdelivr.net/gh/databay-labs/free-proxy-list/socks5.txt", "socks5"},
-	// Anonym0usWork1221 - 量大质量尚可
-	{"https://cdn.jsdelivr.net/gh/Anonym0usWork1221/Free-Proxies/proxy_files/http_proxies.txt", "http"},
-	{"https://cdn.jsdelivr.net/gh/Anonym0usWork1221/Free-Proxies/proxy_files/socks5_proxies.txt", "socks5"},
-	{"https://cdn.jsdelivr.net/gh/Anonym0usWork1221/Free-Proxies/proxy_files/socks4_proxies.txt", "socks5"},
-	// ALIILAPRO
-	{"https://cdn.jsdelivr.net/gh/ALIILAPRO/Proxy/http.txt", "http"},
-	{"https://cdn.jsdelivr.net/gh/ALIILAPRO/Proxy/socks4.txt", "socks5"},
-	// vakhov/fresh-proxy-list
-	{"https://cdn.jsdelivr.net/gh/vakhov/fresh-proxy-list/http.txt", "http"},
-	{"https://cdn.jsdelivr.net/gh/vakhov/fresh-proxy-list/socks5.txt", "socks5"},
-	{"https://cdn.jsdelivr.net/gh/vakhov/fresh-proxy-list/socks4.txt", "socks5"},
-	// Zaeem20
-	{"https://cdn.jsdelivr.net/gh/Zaeem20/FREE_PROXIES_LIST/http.txt", "http"},
-	{"https://cdn.jsdelivr.net/gh/Zaeem20/FREE_PROXIES_LIST/socks4.txt", "socks5"},
-	// hookzof - socks5 专项
-	{"https://cdn.jsdelivr.net/gh/hookzof/socks5_list/proxy.txt", "socks5"},
-	// proxy4parsing
-	{"https://cdn.jsdelivr.net/gh/proxy4parsing/proxy-list/http.txt", "http"},
-	{"https://cdn.jsdelivr.net/gh/proxy4parsing/proxy-list/socks5.txt", "socks5"},
-}
-
-// 所有源
-var allSources = append(fastUpdateSources, slowUpdateSources...)
+// Source 复用配置层的抓取源定义，避免源列表在多个包重复维护。
+type Source = config.ProxySource
 
 type Fetcher struct {
-	sources       []Source
 	client        *http.Client
 	sourceManager *SourceManager
 }
 
-func New(httpURL, socks5URL string, sourceManager *SourceManager) *Fetcher {
+func New(sourceManager *SourceManager) *Fetcher {
 	return &Fetcher{
-		sources:       allSources,
 		sourceManager: sourceManager,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
@@ -88,9 +30,26 @@ func New(httpURL, socks5URL string, sourceManager *SourceManager) *Fetcher {
 	}
 }
 
+func configuredSourceSets() (fastSources, slowSources, allSources []Source) {
+	cfg := config.Get()
+	if cfg != nil {
+		fastSources = config.NormalizeProxySources(cfg.FetchFastSources)
+		slowSources = config.NormalizeProxySources(cfg.FetchSlowSources)
+	}
+	if len(fastSources) == 0 {
+		fastSources = config.DefaultFastFetchSources()
+	}
+	if len(slowSources) == 0 {
+		slowSources = config.DefaultSlowFetchSources()
+	}
+	allSources = append(append([]Source{}, fastSources...), slowSources...)
+	return
+}
+
 // FetchSmart 智能抓取：根据模式和协议需求选择源
 func (f *Fetcher) FetchSmart(mode string, preferredProtocol string) ([]storage.Proxy, error) {
 	var sources []Source
+	fastSources, slowSources, allSources := configuredSourceSets()
 
 	switch mode {
 	case "emergency":
@@ -100,16 +59,16 @@ func (f *Fetcher) FetchSmart(mode string, preferredProtocol string) ([]storage.P
 
 	case "refill":
 		// 补充模式：使用快更新源
-		sources = f.filterAvailableSources(fastUpdateSources, preferredProtocol, false)
+		sources = f.filterAvailableSources(fastSources, preferredProtocol, false)
 		log.Printf("[fetch] 🔄 补充模式: 使用 %d 个快更新源", len(sources))
 
 	case "optimize":
 		// 优化模式：随机选择2-3个慢更新源
-		sources = f.selectRandomSources(slowUpdateSources, 3, preferredProtocol)
+		sources = f.selectRandomSources(slowSources, 3, preferredProtocol)
 		log.Printf("[fetch] ⚡ 优化模式: 使用 %d 个源", len(sources))
 
 	default:
-		sources = f.filterAvailableSources(fastUpdateSources, preferredProtocol, false)
+		sources = f.filterAvailableSources(fastSources, preferredProtocol, false)
 	}
 
 	if len(sources) == 0 {
@@ -209,14 +168,15 @@ func (f *Fetcher) fetchFromSources(sources []Source) ([]storage.Proxy, error) {
 
 // Fetch 从所有来源并发抓取代理
 func (f *Fetcher) Fetch() ([]storage.Proxy, error) {
+	_, _, sources := configuredSourceSets()
 	type result struct {
 		proxies []storage.Proxy
 		source  Source
 		err     error
 	}
 
-	ch := make(chan result, len(f.sources))
-	for _, src := range f.sources {
+	ch := make(chan result, len(sources))
+	for _, src := range sources {
 		go func(s Source) {
 			proxies, err := f.fetchFromURL(s.URL, s.Protocol)
 			ch <- result{proxies: proxies, source: s, err: err}
@@ -225,7 +185,7 @@ func (f *Fetcher) Fetch() ([]storage.Proxy, error) {
 
 	var all []storage.Proxy
 	seen := make(map[string]bool)
-	for range f.sources {
+	for range sources {
 		r := <-ch
 		if r.err != nil {
 			log.Printf("fetch %s error: %v", r.source.URL, r.err)

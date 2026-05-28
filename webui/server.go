@@ -68,18 +68,18 @@ func New(s *storage.Storage, cfg *config.Config, pm *pool.Manager, cm *custom.Ma
 
 func (s *Server) Start() {
 	mux := http.NewServeMux()
-	
+
 	// 添加日志中间件
 	loggedMux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[webui] %s %s | Host: %s | RemoteAddr: %s", 
+		log.Printf("[webui] %s %s | Host: %s | RemoteAddr: %s",
 			r.Method, r.URL.Path, r.Host, r.RemoteAddr)
 		mux.ServeHTTP(w, r)
 	})
-	
+
 	mux.HandleFunc("/", s.handleIndex)
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/logout", s.handleLogout)
-	
+
 	// 只读 API（访客可访问）
 	mux.HandleFunc("/api/stats", s.readOnlyMiddleware(s.apiStats))
 	mux.HandleFunc("/api/proxies", s.readOnlyMiddleware(s.apiProxies))
@@ -88,7 +88,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/pool/quality", s.readOnlyMiddleware(s.apiQualityDistribution))
 	mux.HandleFunc("/api/config", s.readOnlyMiddleware(s.apiConfig))
 	mux.HandleFunc("/api/auth/check", s.apiAuthCheck) // 检查登录状态
-	
+
 	// 管理员 API（需要登录）
 	mux.HandleFunc("/api/proxy/delete", s.authMiddleware(s.apiDeleteProxy))
 	mux.HandleFunc("/api/proxy/refresh", s.authMiddleware(s.apiRefreshProxy))
@@ -182,7 +182,7 @@ func (s *Server) apiAuthCheck(w http.ResponseWriter, r *http.Request) {
 	isAdmin := validSession(r)
 	jsonOK(w, map[string]interface{}{
 		"isAdmin": isAdmin,
-		"mode":    func() string {
+		"mode": func() string {
 			if isAdmin {
 				return "admin"
 			}
@@ -256,7 +256,7 @@ func (s *Server) apiRefreshProxy(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "failed to get proxy", http.StatusInternalServerError)
 		return
 	}
-	
+
 	var targetProxy *storage.Proxy
 	for i := range proxies {
 		if proxies[i].Address == req.Address {
@@ -264,7 +264,7 @@ func (s *Server) apiRefreshProxy(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	
+
 	if targetProxy == nil {
 		jsonError(w, "proxy not found", http.StatusNotFound)
 		return
@@ -274,10 +274,10 @@ func (s *Server) apiRefreshProxy(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		cfg := config.Get()
 		v := validator.New(1, cfg.ValidateTimeout, cfg.ValidateURL)
-		
+
 		log.Printf("[webui] refreshing proxy: %s", req.Address)
 		valid, latency, exitIP, exitLocation := v.ValidateOne(*targetProxy)
-		
+
 		if valid {
 			latencyMs := int(latency.Milliseconds())
 			s.storage.UpdateExitInfo(req.Address, exitIP, exitLocation, latencyMs)
@@ -354,35 +354,35 @@ func (s *Server) apiLogs(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := config.Get()
 	httpSlots, socks5Slots := cfg.CalculateSlots()
-	
+
 	jsonOK(w, map[string]interface{}{
 		// 池子配置
-		"pool_max_size":        cfg.PoolMaxSize,
-		"pool_http_ratio":      cfg.PoolHTTPRatio,
+		"pool_max_size":         cfg.PoolMaxSize,
+		"pool_http_ratio":       cfg.PoolHTTPRatio,
 		"pool_min_per_protocol": cfg.PoolMinPerProtocol,
-		"pool_http_slots":      httpSlots,
-		"pool_socks5_slots":    socks5Slots,
+		"pool_http_slots":       httpSlots,
+		"pool_socks5_slots":     socks5Slots,
 
 		// 延迟配置
-		"max_latency_ms":         cfg.MaxLatencyMs,
-		"max_latency_emergency":  cfg.MaxLatencyEmergency,
-		"max_latency_healthy":    cfg.MaxLatencyHealthy,
+		"max_latency_ms":        cfg.MaxLatencyMs,
+		"max_latency_emergency": cfg.MaxLatencyEmergency,
+		"max_latency_healthy":   cfg.MaxLatencyHealthy,
 
 		// 验证配置
-		"validate_concurrency":   cfg.ValidateConcurrency,
-		"validate_timeout":       cfg.ValidateTimeout,
+		"validate_concurrency": cfg.ValidateConcurrency,
+		"validate_timeout":     cfg.ValidateTimeout,
 
 		// 健康检查配置
-		"health_check_interval":  cfg.HealthCheckInterval,
+		"health_check_interval":   cfg.HealthCheckInterval,
 		"health_check_batch_size": cfg.HealthCheckBatchSize,
 
 		// 优化配置
-		"optimize_interval":      cfg.OptimizeInterval,
-		"replace_threshold":      cfg.ReplaceThreshold,
+		"optimize_interval": cfg.OptimizeInterval,
+		"replace_threshold": cfg.ReplaceThreshold,
 
 		// 地理过滤配置
-		"blocked_countries":      cfg.BlockedCountries,
-		"allowed_countries":      cfg.AllowedCountries,
+		"blocked_countries": cfg.BlockedCountries,
+		"allowed_countries": cfg.AllowedCountries,
 
 		// 自定义订阅代理配置
 		"custom_proxy_mode":       cfg.CustomProxyMode,
@@ -390,6 +390,10 @@ func (s *Server) apiConfig(w http.ResponseWriter, r *http.Request) {
 		"custom_free_priority":    cfg.CustomFreePriority,
 		"custom_probe_interval":   cfg.CustomProbeInterval,
 		"custom_refresh_interval": cfg.CustomRefreshInterval,
+
+		// 抓取源配置
+		"fetch_fast_sources": config.NormalizeProxySources(cfg.FetchFastSources),
+		"fetch_slow_sources": config.NormalizeProxySources(cfg.FetchSlowSources),
 	})
 }
 
@@ -401,25 +405,27 @@ func (s *Server) apiConfigSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		PoolMaxSize           int      `json:"pool_max_size"`
-		PoolHTTPRatio         float64  `json:"pool_http_ratio"`
-		PoolMinPerProtocol    int      `json:"pool_min_per_protocol"`
-		MaxLatencyMs          int      `json:"max_latency_ms"`
-		MaxLatencyEmergency   int      `json:"max_latency_emergency"`
-		MaxLatencyHealthy     int      `json:"max_latency_healthy"`
-		ValidateConcurrency   int      `json:"validate_concurrency"`
-		ValidateTimeout       int      `json:"validate_timeout"`
-		HealthCheckInterval   int      `json:"health_check_interval"`
-		HealthCheckBatchSize  int      `json:"health_check_batch_size"`
-		OptimizeInterval      int      `json:"optimize_interval"`
-		ReplaceThreshold      float64  `json:"replace_threshold"`
-		BlockedCountries      []string `json:"blocked_countries"`
-		AllowedCountries      []string `json:"allowed_countries"`
-		CustomProxyMode       string   `json:"custom_proxy_mode"`
-		CustomPriority        *bool    `json:"custom_priority"`
-		CustomFreePriority    *bool    `json:"custom_free_priority"`
-		CustomProbeInterval   int      `json:"custom_probe_interval"`
-		CustomRefreshInterval int      `json:"custom_refresh_interval"`
+		PoolMaxSize           int                  `json:"pool_max_size"`
+		PoolHTTPRatio         float64              `json:"pool_http_ratio"`
+		PoolMinPerProtocol    int                  `json:"pool_min_per_protocol"`
+		MaxLatencyMs          int                  `json:"max_latency_ms"`
+		MaxLatencyEmergency   int                  `json:"max_latency_emergency"`
+		MaxLatencyHealthy     int                  `json:"max_latency_healthy"`
+		ValidateConcurrency   int                  `json:"validate_concurrency"`
+		ValidateTimeout       int                  `json:"validate_timeout"`
+		HealthCheckInterval   int                  `json:"health_check_interval"`
+		HealthCheckBatchSize  int                  `json:"health_check_batch_size"`
+		OptimizeInterval      int                  `json:"optimize_interval"`
+		ReplaceThreshold      float64              `json:"replace_threshold"`
+		BlockedCountries      []string             `json:"blocked_countries"`
+		AllowedCountries      []string             `json:"allowed_countries"`
+		CustomProxyMode       string               `json:"custom_proxy_mode"`
+		CustomPriority        *bool                `json:"custom_priority"`
+		CustomFreePriority    *bool                `json:"custom_free_priority"`
+		CustomProbeInterval   int                  `json:"custom_probe_interval"`
+		CustomRefreshInterval int                  `json:"custom_refresh_interval"`
+		FetchFastSources      []config.ProxySource `json:"fetch_fast_sources"`
+		FetchSlowSources      []config.ProxySource `json:"fetch_slow_sources"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -437,6 +443,29 @@ func (s *Server) apiConfigSave(w http.ResponseWriter, r *http.Request) {
 	oldCfg := config.Get()
 	oldSize := oldCfg.PoolMaxSize
 	oldRatio := oldCfg.PoolHTTPRatio
+	fastSources := config.NormalizeProxySources(oldCfg.FetchFastSources)
+	slowSources := config.NormalizeProxySources(oldCfg.FetchSlowSources)
+
+	if req.FetchFastSources != nil {
+		var err error
+		fastSources, err = config.ValidateProxySources(req.FetchFastSources)
+		if err != nil {
+			jsonError(w, "invalid fast fetch sources: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if req.FetchSlowSources != nil {
+		var err error
+		slowSources, err = config.ValidateProxySources(req.FetchSlowSources)
+		if err != nil {
+			jsonError(w, "invalid slow fetch sources: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if len(fastSources) == 0 || len(slowSources) == 0 {
+		jsonError(w, "fetch sources cannot be empty", http.StatusBadRequest)
+		return
+	}
 
 	// 更新配置
 	newCfg := *oldCfg
@@ -454,6 +483,8 @@ func (s *Server) apiConfigSave(w http.ResponseWriter, r *http.Request) {
 	newCfg.ReplaceThreshold = req.ReplaceThreshold
 	newCfg.BlockedCountries = req.BlockedCountries
 	newCfg.AllowedCountries = req.AllowedCountries
+	newCfg.FetchFastSources = fastSources
+	newCfg.FetchSlowSources = slowSources
 	if req.CustomProxyMode != "" {
 		newCfg.CustomProxyMode = req.CustomProxyMode
 	}
@@ -492,8 +523,8 @@ func (s *Server) apiConfigSave(w http.ResponseWriter, r *http.Request) {
 		go s.poolMgr.AdjustForConfigChange(oldSize, oldRatio)
 	}
 
-	log.Printf("[config] 配置已更新: 池子=%d HTTP=%.0f%% 延迟=%dms",
-		req.PoolMaxSize, req.PoolHTTPRatio*100, req.MaxLatencyMs)
+	log.Printf("[config] 配置已更新: 池子=%d HTTP=%.0f%% 延迟=%dms 抓取源=%d/%d",
+		req.PoolMaxSize, req.PoolHTTPRatio*100, req.MaxLatencyMs, len(fastSources), len(slowSources))
 	jsonOK(w, map[string]string{"status": "saved"})
 }
 
