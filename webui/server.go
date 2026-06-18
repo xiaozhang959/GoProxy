@@ -131,10 +131,10 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// textAuthMiddleware 用于脚本读取的文本接口：支持 WebUI session 或 Basic Auth。
+// textAuthMiddleware 用于脚本读取的文本接口：支持 WebUI session、Basic Auth 或 token 参数。
 func (s *Server) textAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if validSession(r) || s.validBasicAuth(r) {
+		if validSession(r) || s.validBasicAuth(r) || s.validQueryToken(r) {
 			next(w, r)
 			return
 		}
@@ -153,6 +153,16 @@ func (s *Server) validBasicAuth(r *http.Request) bool {
 	passwordHash := fmt.Sprintf("%x", sha256.Sum256([]byte(password)))
 	passwordMatch := subtle.ConstantTimeCompare([]byte(passwordHash), []byte(s.cfg.WebUIPasswordHash)) == 1
 	return usernameMatch && passwordMatch
+}
+
+func (s *Server) validQueryToken(r *http.Request) bool {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		return false
+	}
+
+	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
+	return subtle.ConstantTimeCompare([]byte(tokenHash), []byte(s.cfg.WebUIPasswordHash)) == 1
 }
 
 // readOnlyMiddleware 只读中间件（访客可访问，但会标记是否为管理员）
