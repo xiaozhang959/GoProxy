@@ -2,6 +2,7 @@ package webui
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -79,6 +80,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/", s.handleIndex)
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/logout", s.handleLogout)
+	mux.HandleFunc("/proxy.txt", s.textAuthMiddleware(s.handleProxyList))
 
 	// 只读 API（访客可访问）
 	mux.HandleFunc("/api/stats", s.readOnlyMiddleware(s.apiStats))
@@ -129,6 +131,30 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// textAuthMiddleware 用于脚本读取的文本接口：支持 WebUI session 或 Basic Auth。
+func (s *Server) textAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if validSession(r) || s.validBasicAuth(r) {
+			next(w, r)
+			return
+		}
+		w.Header().Set("WWW-Authenticate", `Basic realm="GoProxy"`)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	}
+}
+
+func (s *Server) validBasicAuth(r *http.Request) bool {
+	username, password, ok := r.BasicAuth()
+	if !ok {
+		return false
+	}
+
+	usernameMatch := subtle.ConstantTimeCompare([]byte(username), []byte("admin")) == 1
+	passwordHash := fmt.Sprintf("%x", sha256.Sum256([]byte(password)))
+	passwordMatch := subtle.ConstantTimeCompare([]byte(passwordHash), []byte(s.cfg.WebUIPasswordHash)) == 1
+	return usernameMatch && passwordMatch
+}
+
 // readOnlyMiddleware 只读中间件（访客可访问，但会标记是否为管理员）
 func (s *Server) readOnlyMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +201,40 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", MaxAge: -1})
 	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+func (s *Server) handleProxyList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	protocol := r.URL.Query().Get("protocol")
+	if protocol != "" && protocol != "http" && protocol != "socks5" {
+		http.Error(w, "protocol must be http or socks5", http.StatusBadRequest)
+		return
+	}
+
+	var proxies []storage.Proxy
+	var err error
+	if protocol == "" {
+		proxies, err = s.storage.GetAll()
+	} else {
+		proxies, err = s.storage.GetByProtocol(protocol)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	for _, p := range proxies {
+		if p.Protocol == "" || p.Address == "" {
+			continue
+		}
+		fmt.Fprintf(w, "%s://%s\n", p.Protocol, p.Address)
+	}
 }
 
 // apiAuthCheck 检查当前用户是否为管理员
