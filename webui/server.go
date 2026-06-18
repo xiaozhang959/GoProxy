@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -131,38 +132,24 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// textAuthMiddleware 用于脚本读取的文本接口：支持 WebUI session、Basic Auth 或 token 参数。
+// textAuthMiddleware 用于脚本读取的文本接口：支持 WebUI session 或独立 token 参数。
 func (s *Server) textAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if validSession(r) || s.validBasicAuth(r) || s.validQueryToken(r) {
+		if validSession(r) || s.validQueryToken(r) {
 			next(w, r)
 			return
 		}
-		w.Header().Set("WWW-Authenticate", `Basic realm="GoProxy"`)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 	}
 }
 
-func (s *Server) validBasicAuth(r *http.Request) bool {
-	username, password, ok := r.BasicAuth()
-	if !ok {
-		return false
-	}
-
-	usernameMatch := subtle.ConstantTimeCompare([]byte(username), []byte("admin")) == 1
-	passwordHash := fmt.Sprintf("%x", sha256.Sum256([]byte(password)))
-	passwordMatch := subtle.ConstantTimeCompare([]byte(passwordHash), []byte(s.cfg.WebUIPasswordHash)) == 1
-	return usernameMatch && passwordMatch
-}
-
 func (s *Server) validQueryToken(r *http.Request) bool {
 	token := r.URL.Query().Get("token")
-	if token == "" {
+	expected := strings.TrimSpace(config.Get().ProxyListToken)
+	if token == "" || expected == "" {
 		return false
 	}
-
-	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
-	return subtle.ConstantTimeCompare([]byte(tokenHash), []byte(s.cfg.WebUIPasswordHash)) == 1
+	return subtle.ConstantTimeCompare([]byte(token), []byte(expected)) == 1
 }
 
 // readOnlyMiddleware 只读中间件（访客可访问，但会标记是否为管理员）
@@ -424,9 +411,14 @@ func (s *Server) apiLogs(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := config.Get()
 	httpSlots, socks5Slots := cfg.CalculateSlots()
+	proxyListToken := ""
+	if validSession(r) {
+		proxyListToken = cfg.ProxyListToken
+	}
 
 	jsonOK(w, map[string]interface{}{
 		// 池子配置
+		"proxy_list_token":      proxyListToken,
 		"pool_max_size":         cfg.PoolMaxSize,
 		"pool_http_ratio":       cfg.PoolHTTPRatio,
 		"pool_min_per_protocol": cfg.PoolMinPerProtocol,
@@ -496,6 +488,7 @@ func (s *Server) apiConfigSave(w http.ResponseWriter, r *http.Request) {
 		CustomRefreshInterval int                  `json:"custom_refresh_interval"`
 		FetchFastSources      []config.ProxySource `json:"fetch_fast_sources"`
 		FetchSlowSources      []config.ProxySource `json:"fetch_slow_sources"`
+		ProxyListToken        string               `json:"proxy_list_token"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -536,9 +529,15 @@ func (s *Server) apiConfigSave(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "fetch sources cannot be empty", http.StatusBadRequest)
 		return
 	}
+	proxyListToken := strings.TrimSpace(req.ProxyListToken)
+	if !isUUID(proxyListToken) {
+		jsonError(w, "proxy_list_token must be a valid uuid", http.StatusBadRequest)
+		return
+	}
 
 	// 更新配置
 	newCfg := *oldCfg
+	newCfg.ProxyListToken = proxyListToken
 	newCfg.PoolMaxSize = req.PoolMaxSize
 	newCfg.PoolHTTPRatio = req.PoolHTTPRatio
 	newCfg.PoolMinPerProtocol = req.PoolMinPerProtocol
@@ -596,6 +595,25 @@ func (s *Server) apiConfigSave(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[config] 配置已更新: 池子=%d HTTP=%.0f%% 延迟=%dms 抓取源=%d/%d",
 		req.PoolMaxSize, req.PoolHTTPRatio*100, req.MaxLatencyMs, len(fastSources), len(slowSources))
 	jsonOK(w, map[string]string{"status": "saved"})
+}
+
+func isUUID(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	for i, c := range value {
+		switch i {
+		case 8, 13, 18, 23:
+			if c != '-' {
+				return false
+			}
+		default:
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // apiPoolStatus 获取池子状态

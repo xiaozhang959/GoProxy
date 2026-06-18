@@ -434,6 +434,20 @@ tr:hover{background:var(--gray-2);box-shadow:inset 0 0 20px var(--row-hover)}
       </div>
     </div>
 
+    <div class="form-section">
+      <div class="form-section-title" data-i18n="config.section_proxy_list">代理列表接口</div>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label data-i18n="config.proxy_list_token">访问令牌 UUID</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="cfg-proxy-list-token" style="flex:1" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+            <button type="button" class="btn btn-secondary" onclick="generateProxyListToken()" data-i18n="config.generate_token" style="white-space:nowrap">生成</button>
+          </div>
+          <div class="form-help" data-i18n="config.proxy_list_token_help">用于 /proxy.txt?token=...，不要使用 WebUI 密码</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 免费池设置 -->
     <div class="form-section">
       <div class="form-section-title" data-i18n="config.section_free_pool">免费代理池</div>
@@ -736,6 +750,7 @@ const i18n = {
     'msg.config_failed': '配置保存失败',
     'msg.fetch_sources_required': '快速更新源和慢速更新源不能为空',
     'msg.fetch_source_invalid': '抓取源第 {0} 行格式错误，请使用：协议 URL',
+    'msg.proxy_list_token_invalid': '代理列表访问令牌必须是 UUID 格式',
     // 设置弹窗新增
     'config.system_title': '系统设置',
     'config.section_proxy_mode': '代理使用模式',
@@ -745,6 +760,10 @@ const i18n = {
     'config.mode_mixed': '混合 · 平等（不区分来源，按延迟/随机选择）',
     'config.mode_custom_only': '仅订阅代理（只使用订阅导入的代理）',
     'config.mode_free_only': '仅免费代理（只使用公开抓取的代理）',
+    'config.section_proxy_list': '代理列表接口',
+    'config.proxy_list_token': '访问令牌 UUID',
+    'config.proxy_list_token_help': '用于 /proxy.txt?token=...，不要使用 WebUI 密码',
+    'config.generate_token': '生成',
     'config.section_free_pool': '免费代理池',
     'config.pool_capacity': '池子容量',
     'config.pool_capacity_help': '免费代理总槽位',
@@ -901,6 +920,7 @@ const i18n = {
     'msg.config_failed': 'Failed to save configuration',
     'msg.fetch_sources_required': 'Fast and slow fetch sources cannot be empty',
     'msg.fetch_source_invalid': 'Invalid fetch source at line {0}. Use: protocol URL',
+    'msg.proxy_list_token_invalid': 'Proxy list access token must be a UUID',
     'config.system_title': 'System Settings',
     'config.section_proxy_mode': 'Proxy Mode',
     'config.proxy_strategy': 'Outbound Proxy Strategy',
@@ -909,6 +929,10 @@ const i18n = {
     'config.mode_mixed': 'Mixed · Equal (select by latency/random)',
     'config.mode_custom_only': 'Subscription Only',
     'config.mode_free_only': 'Free Only',
+    'config.section_proxy_list': 'Proxy List Endpoint',
+    'config.proxy_list_token': 'Access Token UUID',
+    'config.proxy_list_token_help': 'Used by /proxy.txt?token=...; do not use the WebUI password',
+    'config.generate_token': 'Generate',
     'config.section_free_pool': 'Free Proxy Pool',
     'config.pool_capacity': 'Pool Capacity',
     'config.pool_capacity_help': 'Total free proxy slots',
@@ -1409,6 +1433,7 @@ async function openSettings() {
   document.getElementById('cfg-allowed-countries').value = (cfg.allowed_countries || []).join(',');
   document.getElementById('cfg-fetch-fast-sources').value = sourcesToText(cfg.fetch_fast_sources);
   document.getElementById('cfg-fetch-slow-sources').value = sourcesToText(cfg.fetch_slow_sources);
+  document.getElementById('cfg-proxy-list-token').value = cfg.proxy_list_token || '';
   // 将 mode + priority 映射到5种模式
   const mode = cfg.custom_proxy_mode || 'mixed';
   const customPri = cfg.custom_priority === true;
@@ -1430,6 +1455,18 @@ function closeSettings() {
   document.getElementById('settings-modal').classList.remove('show');
 }
 
+function generateProxyListToken() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    document.getElementById('cfg-proxy-list-token').value = window.crypto.randomUUID();
+    return;
+  }
+  document.getElementById('cfg-proxy-list-token').value = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 async function saveConfig() {
   let fastSources = [];
   let slowSources = [];
@@ -1442,6 +1479,11 @@ async function saveConfig() {
   }
   if (fastSources.length === 0 || slowSources.length === 0) {
     alert(t('msg.fetch_sources_required'));
+    return;
+  }
+  const proxyListToken = document.getElementById('cfg-proxy-list-token').value.trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proxyListToken)) {
+    alert(t('msg.proxy_list_token_invalid'));
     return;
   }
 
@@ -1477,6 +1519,7 @@ async function saveConfig() {
     custom_refresh_interval: parseInt(document.getElementById('cfg-custom-refresh').value),
     fetch_fast_sources: fastSources,
     fetch_slow_sources: slowSources,
+    proxy_list_token: proxyListToken,
   };
 
   const result = await api('/api/config/save', {

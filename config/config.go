@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -155,6 +156,9 @@ type Config struct {
 	// WebUI 密码 SHA256 哈希
 	WebUIPasswordHash string
 
+	// 代理列表文本接口访问令牌
+	ProxyListToken string
+
 	// 代理池本地监听端口（随机轮换模式）
 	ProxyPort string
 
@@ -243,11 +247,25 @@ func passwordHash(plain string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(plain)))
 }
 
+func newUUID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(fmt.Sprintf("generate proxy list token: %v", err))
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
 func DefaultConfig() *Config {
 	// 优先从环境变量 WEBUI_PASSWORD 读取密码，未设置时使用默认密码
 	password := os.Getenv("WEBUI_PASSWORD")
 	if password == "" {
 		password = DefaultPassword
+	}
+	proxyListToken := strings.TrimSpace(os.Getenv("PROXY_LIST_TOKEN"))
+	if proxyListToken == "" {
+		proxyListToken = newUUID()
 	}
 
 	// 读取代理认证配置
@@ -303,6 +321,7 @@ func DefaultConfig() *Config {
 		// 基础服务配置
 		WebUIPort:         ":7778",
 		WebUIPasswordHash: passwordHash(password),
+		ProxyListToken:    proxyListToken,
 		ProxyPort:         ":7777",
 		StableProxyPort:   ":7776",
 		SOCKS5Port:        ":7779",
@@ -388,6 +407,9 @@ func Load() *Config {
 			}
 			if saved.PoolMinPerProtocol > 0 {
 				cfg.PoolMinPerProtocol = saved.PoolMinPerProtocol
+			}
+			if strings.TrimSpace(saved.ProxyListToken) != "" {
+				cfg.ProxyListToken = strings.TrimSpace(saved.ProxyListToken)
 			}
 
 			// 延迟配置
@@ -492,6 +514,9 @@ func Get() *Config {
 
 // savedConfig 持久化可调整的字段
 type savedConfig struct {
+	// 文本代理列表接口
+	ProxyListToken string `json:"proxy_list_token,omitempty"`
+
 	// 池子配置
 	PoolMaxSize        int     `json:"pool_max_size"`
 	PoolHTTPRatio      float64 `json:"pool_http_ratio"`
@@ -545,6 +570,7 @@ func Save(cfg *Config) error {
 	customPriority := cfg.CustomPriority
 	customFreePriority := cfg.CustomFreePriority
 	data, err := json.MarshalIndent(savedConfig{
+		ProxyListToken:        strings.TrimSpace(cfg.ProxyListToken),
 		PoolMaxSize:           cfg.PoolMaxSize,
 		PoolHTTPRatio:         cfg.PoolHTTPRatio,
 		PoolMinPerProtocol:    cfg.PoolMinPerProtocol,
